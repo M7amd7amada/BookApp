@@ -1,24 +1,57 @@
-var builder = WebApplication.CreateBuilder(args);
+using Azure.Core;
+using BookApp.DataService.Data;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
-// Add services to the container.
+var builder = WebApplication.CreateBuilder(args);
+var connectionString = @"Server=localhost;
+            Database=master;
+            Trusted_Connection=True;
+            TrustServerCertificate=True;";
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(config =>
+        {
+            config.WithOrigins(builder.Configuration["AllowedOrigins"] ?? string.Empty);
+            config.AllowAnyHeader();
+            config.AllowAnyMethod();
+        });
+
+        options.AddPolicy("AnyOrigin", config =>
+        {
+            config.AllowAnyHeader();
+            config.AllowAnyOrigin();
+            config.AllowAnyMethod();
+        });
+    }
+);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+if (app.Configuration.GetValue<bool>("UseDeveloperExceptionPage"))
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("api/error");
 }
 
 app.UseHttpsRedirection();
 
+app.UseCors();
+
 app.UseAuthorization();
+
+app.MapGet("api/error", [ResponseCache(NoStore = true)] () =>
+    Results.Problem()).RequireCors("AnyOrigin");
 
 app.MapControllers();
 
